@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <style>
+      #canvas {
+        background-color: black;
+      }
+    </style>
+  </head>
+
+  <body>
+    <canvas id="canvas" width="512" height="256"></canvas>
+
+	<button data-playing="false" role="switch" aria-checked="false">
+		<span>Play/Pause</span>
+	</button>
+	
+	<!-- TODO : create audio elements from an array of sources -->
+	<audio src="viper.mp3"></audio>
+
+    <script>
+		// TODO add WS once I know how the color are being used
+		// FIXME merge the "color-thief from canvas from webcam" in here
+		const canvasElt = document.querySelector("#canvas");
+
+		const AudioContext = window.AudioContext || window.webkitAudioContext;
+		const audioContext = new AudioContext();
+
+		const audioElement = document.querySelector('audio');
+		const track = audioContext.createMediaElementSource(audioElement);
+
+		// Select our play button
+		const playButton = document.querySelector('button');
+
+		playButton.addEventListener('click', () => {
+			// Check if context is in suspended state (autoplay policy)
+			if (audioContext.state === 'suspended') {
+				audioContext.resume();
+			}
+
+			// Play or pause track depending on state
+			if (playButton.dataset.playing === 'false') {
+				audioElement.play();
+				playButton.dataset.playing = 'true';
+			} else if (playButton.dataset.playing === 'true') {
+				audioElement.pause();
+				playButton.dataset.playing = 'false';
+			}
+		}, false);
+
+		audioElement.addEventListener('ended', () => {
+			playButton.dataset.playing = 'false';
+		}, false);
+
+
+		const analyserNode = new AnalyserNode(audioContext);
+		const javascriptNode = audioContext.createScriptProcessor(1024, 1, 1);
+		
+		// TODO : once the sources are in an instantiated array of elements from an array of source paths, plug them all in the analyser
+		track.connect(audioContext.destination);
+		track.connect(analyserNode);
+
+		analyserNode.connect(javascriptNode);
+		javascriptNode.connect(audioContext.destination);
+
+		// Set up the event handler that is triggered every time enough samples have been collected
+		// then trigger the audio analysis and draw the results
+		javascriptNode.onaudioprocess = () => {
+			// Read the frequency values
+			const amplitudeArray = new Uint8Array(analyserNode.frequencyBinCount);
+
+			// Get the time domain data for this sample
+			analyserNode.getByteTimeDomainData(amplitudeArray);
+
+			// Draw the display when the audio is playing
+			if (audioContext.state === "running") {
+				// Draw the time domain in the canvas
+				requestAnimationFrame(() => {
+					// Get the canvas 2d context
+					const canvasContext = canvasElt.getContext("2d");
+
+					// Clear the canvas
+					canvasContext.clearRect(0, 0, canvasElt.width, canvasElt.height);
+
+					// Draw the amplitude inside the canvas
+					for (let i = 0; i < amplitudeArray.length; i++) {
+					const value = amplitudeArray[i] / 256;
+					const y = canvasElt.height - canvasElt.height * value;
+					canvasContext.fillStyle = "white";
+					canvasContext.fillRect(i, y, 1, 1);
+					}
+				});
+			}
+		};
+    </script>
+  </body>
+</html>
