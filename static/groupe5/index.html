@@ -3,99 +3,250 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
+    <script src="./libs/color-thief.umd.js"></script>
     <style>
+      video,
+      canvas,
+      img {
+        width: 500px;
+        height: 500px;
+      }
+
       #canvas {
         background-color: black;
+      }
+
+      #dominant {
+        width: 100px;
+        height: 100px;
+      }
+
+      #palette {
+        display: flex;
+      }
+
+      #palette > * {
+        width: 50px;
+        height: 50px;
       }
     </style>
   </head>
 
   <body>
+    <video id="feed"></video>
+    <canvas id="buffer"></canvas>
+    <img id="sampler" />
+    <div id="dominant"></div>
+    <div id="palette">
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+
     <canvas id="canvas" width="512" height="256"></canvas>
 
-	<button data-playing="false" role="switch" aria-checked="false">
-		<span>Play/Pause</span>
-	</button>
-	
-	<!-- TODO : create audio elements from an array of sources -->
-	<audio src="viper.mp3"></audio>
+    <button data-playing="false" role="switch" aria-checked="false">
+      <span>Play/Pause</span>
+    </button>
+
+    <!-- TODO : create audio elements from an array of sources -->
+    <audio src="viper.mp3"></audio>
 
     <script>
-		// TODO add audio worklet instead of the deprecated scriptProcessor node : https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode
-			// and also submit the change to the web audio API repo of example https://github.com/mdn/webaudio-examples
-		// TODO add WS once I know how the color are being used
-		// FIXME merge the "color-thief from canvas from webcam" in here
-		const canvasElt = document.querySelector("#canvas");
+      // TODO add audio worklet instead of the deprecated scriptProcessor node : https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode
+      // and also submit the change to the web audio API repo of example https://github.com/mdn/webaudio-examples
+      // TODO add WS once I know how the color are being used
+      // FIXME merge the "color-thief from canvas from webcam" in here
 
-		const AudioContext = window.AudioContext || window.webkitAudioContext;
-		const audioContext = new AudioContext();
+      // audio handling
+      {
+        const canvasElt = document.querySelector("#canvas");
 
-		const audioElement = document.querySelector('audio');
-		const track = audioContext.createMediaElementSource(audioElement);
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioContext = new AudioContext();
 
-		// Select our play button
-		const playButton = document.querySelector('button');
+        const audioElement = document.querySelector("audio");
+        const track = audioContext.createMediaElementSource(audioElement);
 
-		playButton.addEventListener('click', () => {
-			// Check if context is in suspended state (autoplay policy)
-			if (audioContext.state === 'suspended') {
-				audioContext.resume();
-			}
+        // Select our play button
+        const playButton = document.querySelector("button");
 
-			// Play or pause track depending on state
-			if (playButton.dataset.playing === 'false') {
-				audioElement.play();
-				playButton.dataset.playing = 'true';
-			} else if (playButton.dataset.playing === 'true') {
-				audioElement.pause();
-				playButton.dataset.playing = 'false';
-			}
-		}, false);
+        playButton.addEventListener(
+          "click",
+          () => {
+            // Check if context is in suspended state (autoplay policy)
+            if (audioContext.state === "suspended") {
+              audioContext.resume();
+            }
 
-		audioElement.addEventListener('ended', () => {
-			playButton.dataset.playing = 'false';
-		}, false);
+            // Play or pause track depending on state
+            if (playButton.dataset.playing === "false") {
+              audioElement.play();
+              playButton.dataset.playing = "true";
+            } else if (playButton.dataset.playing === "true") {
+              audioElement.pause();
+              playButton.dataset.playing = "false";
+            }
+          },
+          false
+        );
 
+        audioElement.addEventListener(
+          "ended",
+          () => {
+            playButton.dataset.playing = "false";
+          },
+          false
+        );
 
-		const analyserNode = new AnalyserNode(audioContext);
-		const javascriptNode = audioContext.createScriptProcessor(1024, 1, 1);
-		
-		// TODO : once the sources are in an instantiated array of elements from an array of source paths, plug them all in the analyser
-		track.connect(audioContext.destination);
-		track.connect(analyserNode);
+        const analyserNode = new AnalyserNode(audioContext);
+        const javascriptNode = audioContext.createScriptProcessor(1024, 1, 1);
 
-		analyserNode.connect(javascriptNode);
-		javascriptNode.connect(audioContext.destination);
+        // TODO : once the sources are in an instantiated array of elements from an array of source paths, plug them all in the analyser
+        track.connect(audioContext.destination);
+        track.connect(analyserNode);
 
-		// Set up the event handler that is triggered every time enough samples have been collected
-		// then trigger the audio analysis and draw the results
-		javascriptNode.onaudioprocess = () => {
-			// Read the frequency values
-			const amplitudeArray = new Uint8Array(analyserNode.frequencyBinCount);
+        analyserNode.connect(javascriptNode);
+        javascriptNode.connect(audioContext.destination);
 
-			// Get the time domain data for this sample
-			analyserNode.getByteTimeDomainData(amplitudeArray);
+        // Set up the event handler that is triggered every time enough samples have been collected
+        // then trigger the audio analysis and draw the results
+        javascriptNode.onaudioprocess = () => {
+          // Read the frequency values
+          const amplitudeArray = new Uint8Array(analyserNode.frequencyBinCount);
 
-			// Draw the display when the audio is playing
-			if (audioContext.state === "running") {
-				// Draw the time domain in the canvas
-				requestAnimationFrame(() => {
-					// Get the canvas 2d context
-					const canvasContext = canvasElt.getContext("2d");
+          // Get the time domain data for this sample
+          analyserNode.getByteTimeDomainData(amplitudeArray);
 
-					// Clear the canvas
-					canvasContext.clearRect(0, 0, canvasElt.width, canvasElt.height);
+          // Draw the display when the audio is playing
+          if (audioContext.state === "running") {
+            // Draw the time domain in the canvas
+            requestAnimationFrame(() => {
+              // Get the canvas 2d context
+              const canvasContext = canvasElt.getContext("2d");
 
-					// Draw the amplitude inside the canvas
-					for (let i = 0; i < amplitudeArray.length; i++) {
-					const value = amplitudeArray[i] / 256;
-					const y = canvasElt.height - canvasElt.height * value;
-					canvasContext.fillStyle = "white";
-					canvasContext.fillRect(i, y, 1, 1);
-					}
-				});
-			}
-		};
+              // Clear the canvas
+              canvasContext.clearRect(0, 0, canvasElt.width, canvasElt.height);
+
+              // Draw the amplitude inside the canvas
+              for (let i = 0; i < amplitudeArray.length; i++) {
+                const value = amplitudeArray[i] / 256;
+                const y = canvasElt.height - canvasElt.height * value;
+                canvasContext.fillStyle = "white";
+                canvasContext.fillRect(i, y, 1, 1);
+              }
+            });
+          }
+        };
+      }
+
+      // color handling
+      {
+        const thief = new ColorThief();
+        const thiefQuality = 5; //how many pixel to skip, 1 is best and also slowest
+
+        const videoPlayer = document.querySelector("#feed");
+        const canvas = document.querySelector("#buffer");
+        const sampler = document.querySelector("#sampler");
+        const dominantColor = document.querySelector("#dominant");
+        const palette = document.querySelector("#palette");
+
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(function (mediaStream) {
+            videoPlayer.srcObject = mediaStream;
+            document.querySelector("#feed").srcObject = mediaStream;
+            videoPlayer.onloadedmetadata = function (e) {
+              videoPlayer.play();
+            };
+          })
+          .catch(function (err) {
+            console.log(err.name + ": " + err.message);
+          }); // always check for errors at the end.
+
+        sampler.addEventListener("load", () => {
+          const dominant = RGBToHSL(...thief.getColor(sampler, thiefQuality));
+          dominantColor.style.backgroundColor = `hsl(${dominant[0]},${dominant[1]}%,${dominant[2]}%)`;
+
+          const colors = thief
+            .getPalette(sampler, 20, thiefQuality)
+            .map((rgbArray) => RGBToHSL(rgbArray[0], rgbArray[1], rgbArray[2]));
+
+          colors.forEach((el, i) => {
+            palette.children[
+              i
+            ].style.backgroundColor = `hsl(${el[0]},${el[1]}%,${el[2]}%)`;
+          });
+        });
+
+        setInterval(() => {
+          canvas
+            .getContext("2d")
+            .drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+          let image_data_url = canvas.toDataURL("image/jpeg");
+          sampler.setAttribute("src", image_data_url);
+        }, 500);
+
+        function RGBToHSL(r, g, b) {
+          // Make r, g, and b fractions of 1
+          r /= 255;
+          g /= 255;
+          b /= 255;
+
+          // Find greatest and smallest channel values
+          let cmin = Math.min(r, g, b),
+            cmax = Math.max(r, g, b),
+            delta = cmax - cmin,
+            h = 0,
+            s = 0,
+            l = 0;
+
+          // Calculate hue
+          // No difference
+          if (delta == 0) h = 0;
+          // Red is max
+          else if (cmax == r) h = ((g - b) / delta) % 6;
+          // Green is max
+          else if (cmax == g) h = (b - r) / delta + 2;
+          // Blue is max
+          else h = (r - g) / delta + 4;
+
+          h = Math.round(h * 60);
+
+          // Make negative hues positive behind 360°
+          if (h < 0) h += 360;
+
+          // Calculate lightness
+          l = (cmax + cmin) / 2;
+
+          // Calculate saturation
+          s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+
+          // Multiply l and s by 100
+          s = +(s * 100).toFixed(1);
+          l = +(l * 100).toFixed(1);
+
+          // return "hsl(" + h + "," + s + "%," + l + "%)";
+          return [h, s, l];
+        }
+      }
     </script>
   </body>
 </html>
