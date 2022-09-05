@@ -1,12 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
-</head>
-<body>
-    <!-- todo use localstorage + form to change the ports and IPs if needed -->
-</body>
+  </head>
+  <body>
+    <input id="newIP" type="text" />
+    <button onclick="saveIP()">Save new server IP for this device</button>
+    <button onclick="deleteIP()">Return back to using localhost</button>
+    <script>
+      const input = document.querySelector("#newIP");
+      console.log(input);
+
+      if (localStorage.getItem("IP") != null) {
+        input.value = localStorage.getItem("IP");
+      }
+
+      function saveIP() {
+        if (isIPV4(input.value)) {
+          localStorage.setItem("IP", input.value);
+        } else {
+          console.error(input.value + "is not an IPv4 address");
+        }
+      }
+
+      function deleteIP() {
+        localStorage.removeItem("IP");
+      }
+
+      function isIPV4(address) {
+        return (
+          address.match(/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/) != null
+        );
+      }
+    </script>
+  </body>
 </html>
