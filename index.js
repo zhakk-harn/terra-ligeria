@@ -4,9 +4,9 @@ const { SerialPort } = require("serialport");
 const { ReadlineParser } = require("@serialport/parser-readline");
 const express = require("express");
 
-const localIP = Object.entries(networkInterfaces())
-  .find((kv) => kv[0].toLowerCase().includes("wi-fi"))[1]
-  .find((v) => v.family == 4).address;
+const localIP = Object.entries(networkInterfaces()).find((kv) => kv[0].toLowerCase().includes("wi-fi"))[1]
+.find((v) => v.family.toString().includes("4")).address
+console.dir(localIP);
 
 const app = express();
 const expressPort = 3000;
@@ -21,14 +21,18 @@ wsServer.on("close", (closing) => sockets.filter((s) => s != closing));
 
 SerialPort.list().then((portListings) => {
   portListings.forEach((portListing) => {
-    const port = new SerialPort({ path: portListing.path, baudRate: 115200 });
+    try{
+      const port = new SerialPort({ path: portListing.path, baudRate: 115200 });
 
-    const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
-    parser.on("data", (data) => {
-      dataState = data;
-      console.log(getDebugInfo());
-      sockets.forEach((s) => s.send(dataState));
-    });
+      port.on("error", e => console.error(e));
+
+      const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
+      parser.on("data", (data) => {
+        dataState = data;
+        console.log(getDebugInfo());
+        sockets.forEach((s) => s.send(dataState));
+      });
+    }catch(e){}
   });
 });
 
